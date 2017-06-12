@@ -6,6 +6,9 @@ import router from './router'
 
 Vue.config.productionTip = false
 
+// require less file
+require('./less/common.less')
+
 /* eslint-disable no-new */
 new Vue({
   el: '#app',
