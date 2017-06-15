@@ -6,6 +6,7 @@
 import { colors } from './util'
 import { initShaders } from './book'
 import { Matrix4 } from './matrix'
+// import logoSrc from './../assets/sky.jpg'
 console.log('colors', colors)
 export function main (canvas, config) {
   // 设置canvas尺寸
@@ -16,48 +17,69 @@ export function main (canvas, config) {
 
   let VSHADER_SOURCE = `
     attribute vec4 aPosition;
-    uniform vec4 uTranslation;
     uniform mat4 uModelMatrix;
     attribute float aPointSize;
+    attribute vec4 aColor;
+    varying vec4 vColor;
+    attribute vec2 aTexCoord;
+    varying vec2 vTexCoord;
     void main() {
       gl_Position = uModelMatrix * aPosition;
       gl_PointSize = aPointSize;
+      vTexCoord = aTexCoord;
+      vColor = aColor;
     }
   `
   let FSHADER_SOURCE = `
     precision mediump float;
-    uniform vec4 uFragColor;
+    varying vec4 vColor;
+    uniform float uWidth;
+    uniform float uHeight;
+    uniform sampler2D uSample;
+    varying vec2 vTexCoord;
     void main() {
-      gl_FragColor = uFragColor;
+      gl_FragColor = texture2D(uSample, vTexCoord);
     }
   `
+  // gl_FragColor = vec4(gl_FragCoord.x / uWidth, 0.0, gl_FragCoord.y / uHeight, 1.0);
+  // gl_FragColor = vColor;
   if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
     console.log('Failed to get the rendering context for WebGL')
     return
   }
   let aPosition = gl.getAttribLocation(gl.program, 'aPosition')
-  let uTranslation = gl.getUniformLocation(gl.program, 'uTranslation')
   let uModelMatrix = gl.getUniformLocation(gl.program, 'uModelMatrix')
   let aPointSize = gl.getAttribLocation(gl.program, 'aPointSize')
-  let uFragColor = gl.getUniformLocation(gl.program, 'uFragColor')
+  let aColor = gl.getAttribLocation(gl.program, 'aColor')
+  let uWidth = gl.getUniformLocation(gl.program, 'uWidth')
+  let uHeight = gl.getUniformLocation(gl.program, 'uHeight')
+  let aTexCoord = gl.getAttribLocation(gl.program, 'aTexCoord')
   if (aPosition < 0) {
     console.log('Failed to get the storage location of a_Position')
     return
   }
-  if (uTranslation < 0) {
-    console.log('Failed to get the storage location of u_Translation')
+  if (!uModelMatrix) {
+    console.log('Failed to get the storage location of uModelMatrix')
     return
   }
   if (aPointSize < 0) {
     console.log('Failed to get the storage location of a_PointSize')
     return
   }
-  if (!uFragColor) {
-    console.log('Failed to get the storage location of u_FragColor')
+  if (aColor < 0) {
+    console.log('Failed to get the storage location of a_Color')
     return
   }
-  if (!uModelMatrix) {
-    console.log('Failed to get the storage location of uModelMatrix')
+  if (uWidth < 0) {
+    console.log('Failed to get the storage location of uWidth')
+    return
+  }
+  if (uHeight < 0) {
+    console.log('Failed to get the storage location of uHeight')
+    return
+  }
+  if (aTexCoord < 0) {
+    console.log('Failed to get the storage location of aTexCoord')
     return
   }
   // let gPoints = []
@@ -90,20 +112,28 @@ export function main (canvas, config) {
     console.log('Failed to set the positions of the vertices')
     return
   }
+  // 配置纹理
+  if (!initTextures(gl, n)) {
+    console.log('Failed to intialize the texture.')
+    return
+  }
 
   let xModelMatrix = new Matrix4()
   xModelMatrix.setTranslate(0.0, 0.0, 0.0)
-
-  clear(gl)
-  gl.vertexAttrib1f(aPointSize, 10.0)
-  gl.uniformMatrix4fv(uModelMatrix, false, xModelMatrix.elements)
-  // gl.uniform4f(uTranslation, 0.5, 0.5, 0.0, 0.0)
-  gl.uniform4f(uFragColor, 1.0, 0.0, 0.0, 1.0)
-  gl.drawArrays(gl.POINTS, 0, n)
+  // clear(gl)
+  // gl.uniform1f(uWidth, gl.drawingBufferWidth)
+  // gl.uniform1f(uHeight, gl.drawingBufferHeight)
+  // gl.uniformMatrix4fv(uModelMatrix, false, xModelMatrix.elements)
+  // gl.drawArrays(gl.TRIANGLE_STRIP, 0, n) // POINTS TRIANGLES
 
   function initVertexBuffers (gl) {
-    let vertices = new Float32Array([0.0, 0.2, -0.2, -0.2, 0.2, -0.2])
-    let n = 3
+    let verticesSizes = new Float32Array([
+      -0.2, 0.2, 10.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+      -0.2, -0.2, 10.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+      0.2, 0.2, 10.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+      0.2, -0.2, 10.0, 1.0, 0.0, 1.0, 1.0, 0.0
+    ])
+    let n = 4
     // 创建缓冲区对象
     let vertexBuffer = gl.createBuffer()
     if (!vertexBuffer) {
@@ -115,27 +145,71 @@ export function main (canvas, config) {
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
 
     // 向缓冲区对象中写入数据
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW)
-    let aPosition = gl.getAttribLocation(gl.program, 'aPosition')
+    gl.bufferData(gl.ARRAY_BUFFER, verticesSizes, gl.STATIC_DRAW)
+    let FSIZE = verticesSizes.BYTES_PER_ELEMENT
     // 将缓冲区对象分配给a_Position变量
-    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0)
-
+    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, FSIZE * 8, 0)
     // 连接变量与分配给它的缓冲区对象
     gl.enableVertexAttribArray(aPosition)
 
-    let sizes = new Float32Array([10.0, 20.0, 30.0])
-    let sizeBuffer = gl.createBuffer()
-    if (!sizeBuffer) {
-      console.log('Failed to create the sizeBuffer object')
-      return -1
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, sizeBuffer)
-    gl.bufferData(gl.ARRAY_BUFFER, sizes, gl.STATIC_DRAW)
-    gl.vertexAttribPointer(aPointSize, 1, gl.FLOAT, false, 0, 0)
+    gl.vertexAttribPointer(aPointSize, 1, gl.FLOAT, false, FSIZE * 8, FSIZE * 2)
     gl.enableVertexAttribArray(aPointSize)
 
+    gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, FSIZE * 8, FSIZE * 3)
+    gl.enableVertexAttribArray(aColor)
+
+    gl.vertexAttribPointer(aTexCoord, 2, gl.FLOAT, false, FSIZE * 8, FSIZE * 6)
+    gl.enableVertexAttribArray(aTexCoord)
+
     return n
+  }
+
+  function initTextures (gl, n) {
+    console.log('initTextures')
+    let texture = gl.createTexture()
+    if (!texture) {
+      console.log('Failed to create the texture object')
+      return false
+    }
+    let uSample = gl.getUniformLocation(gl.program, 'uSample')
+    if (!uSample) {
+      console.log('Failed to get the storage location of u_Sampler')
+      return false
+    }
+
+    let image = new Image()
+    if (!image) {
+      console.log('Failed to create the image object')
+      return false
+    }
+
+    image.onload = function () {
+      console.log('image load success!')
+      loadTexture(gl, n, texture, uSample, image)
+    }
+    // image.src = logoSrc
+    image.src = '../../static/sky.jpg'
+
+    return true
+  }
+
+  function loadTexture (gl, n, texture, uSample, image) {
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1) // Flip the image's y axis
+    // Enable texture unit0
+    gl.activeTexture(gl.TEXTURE0)
+    // Bind the texture object to the target
+    gl.bindTexture(gl.TEXTURE_2D, texture)
+
+    // Set the texture parameters
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    // Set the texture image
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image)
+
+    // Set the texture unit 0 to the sampler
+    gl.uniform1i(uSample, 0)
+
+    clear(gl)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, n) // Draw the rectangle
   }
 }
 
