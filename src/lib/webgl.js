@@ -35,10 +35,10 @@ export function main (canvas, config) {
     varying vec4 vColor;
     uniform float uWidth;
     uniform float uHeight;
-    uniform sampler2D uSample;
+    uniform sampler2D uSampler;
     varying vec2 vTexCoord;
     void main() {
-      gl_FragColor = texture2D(uSample, vTexCoord);
+      gl_FragColor = texture2D(uSampler, vTexCoord);
     }
   `
   // gl_FragColor = vec4(gl_FragCoord.x / uWidth, 0.0, gl_FragCoord.y / uHeight, 1.0);
@@ -171,8 +171,8 @@ export function main (canvas, config) {
       console.log('Failed to create the texture object')
       return false
     }
-    let uSample = gl.getUniformLocation(gl.program, 'uSample')
-    if (!uSample) {
+    let uSampler = gl.getUniformLocation(gl.program, 'uSampler')
+    if (!uSampler) {
       console.log('Failed to get the storage location of u_Sampler')
       return false
     }
@@ -185,7 +185,7 @@ export function main (canvas, config) {
 
     image.onload = function () {
       console.log('image load success!')
-      loadTexture(gl, n, texture, uSample, image)
+      loadTexture(gl, n, texture, uSampler, image)
     }
     // image.src = logoSrc
     image.src = '../../static/sky.jpg'
@@ -193,7 +193,7 @@ export function main (canvas, config) {
     return true
   }
 
-  function loadTexture (gl, n, texture, uSample, image) {
+  function loadTexture (gl, n, texture, uSampler, image) {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1) // Flip the image's y axis
     // Enable texture unit0
     gl.activeTexture(gl.TEXTURE0)
@@ -206,7 +206,7 @@ export function main (canvas, config) {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image)
 
     // Set the texture unit 0 to the sampler
-    gl.uniform1i(uSample, 0)
+    gl.uniform1i(uSampler, 0)
 
     clear(gl)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, n) // Draw the rectangle
