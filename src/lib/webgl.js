@@ -26,12 +26,15 @@ export function main (canvas, config) {
     uniform vec3 uLightColor;
     uniform vec3 uLightDirection;
     varying vec4 vColor;
+    uniform vec3 uAmbientLight;
+    uniform mat4 uNormalMatrix;
     void main() {
       gl_Position = uMvpMatrix * aPosition;
-      vec3 normal = normalize(vec3(aNormal));
+      vec3 normal = normalize(vec3(vec3(uNormalMatrix * aNormal)));
       float nDotL = max(dot(uLightDirection, normal), 0.0);
       vec3 diffuse = uLightColor * vec3(aColor) * nDotL;
-      vColor = vec4(diffuse, aColor.a);
+      vec3 ambient = uAmbientLight * aColor.rgb;
+      vColor = vec4(diffuse + ambient, aColor.a);
     }
   `
   let FSHADER_SOURCE = `
@@ -52,6 +55,8 @@ export function main (canvas, config) {
   let aColor = gl.getAttribLocation(gl.program, 'aColor')
   let uLightColor = gl.getUniformLocation(gl.program, 'uLightColor')
   let uLightDirection = gl.getUniformLocation(gl.program, 'uLightDirection')
+  let uAmbientLight = gl.getUniformLocation(gl.program, 'uAmbientLight')
+  let uNormalMatrix = gl.getUniformLocation(gl.program, 'uNormalMatrix')
   if (aPosition < 0) {
     console.log('Failed to get the storage location of a_Position')
     return
@@ -72,6 +77,14 @@ export function main (canvas, config) {
     console.log('Failed to get the storage location of uLightDirection')
     return
   }
+  if (uAmbientLight < 0) {
+    console.log('Failed to get the storage location of uAmbientLight')
+    return
+  }
+  if (uNormalMatrix < 0) {
+    console.log('Failed to get the storage location of uNormalMatrix')
+    return
+  }
 
   let n = initVertexBuffers(gl)
   if (n < 0) {
@@ -83,6 +96,7 @@ export function main (canvas, config) {
   let modelMatrix = new Matrix4()
   let viewMatrix = new Matrix4()
   let projMatrix = new Matrix4()
+  let normalMatrix = new Matrix4()
   // let eyeX = 0.2
   // let eyeY = 0.25
   // let eyeZ = 0.25
@@ -91,7 +105,8 @@ export function main (canvas, config) {
   let eyeZ = 7.0
   function draw (gl, n, uMvpMatrix, mvpMatrix) {
     // projMatrix.setOrtho(-0.5, 0.5, -1.0, 1.0, 0.0, 2.0)
-    modelMatrix.setTranslate(0, 0, 0)
+    modelMatrix.setTranslate(0, 0.1, 0)
+    modelMatrix.rotate(45, 0, 0, 1)
     viewMatrix.setLookAt(eyeX, eyeY, eyeZ, 0, 0, 0, 0, 1, 0)
     projMatrix.setPerspective(30, canvasSize.width / canvasSize.height, 1, 100)
     mvpMatrix.set(projMatrix).multiply(viewMatrix).multiply(modelMatrix)
@@ -100,6 +115,10 @@ export function main (canvas, config) {
     let lightDirection = new Vector3([0.5, 3.0, 4.0])
     lightDirection.normalize()
     gl.uniform3fv(uLightDirection, lightDirection.elements)
+    gl.uniform3f(uAmbientLight, 0.2, 0.2, 0.2)
+    normalMatrix.setInverseOf(modelMatrix)
+    normalMatrix.transpose()
+    gl.uniformMatrix4fv(uNormalMatrix, false, normalMatrix.elements)
     clear(gl)
     gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_BYTE, 0) // POINTS TRIANGLES
   }
